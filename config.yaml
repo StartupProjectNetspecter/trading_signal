@@ -1,0 +1,70 @@
+# ============================================================
+#  Gold SMC/ICT Signal Bot - configuration
+#  All session times are New York local time (handles DST automatically).
+# ============================================================
+
+symbol: XAUUSD
+
+data:
+  source: mt5 # dukascopy (free history) | mt5 (your broker)
+  start: "2023-01-01" # backtest history start (UTC date)
+  end: null # null = yesterday
+  dir: data
+  dukascopy_instrument: XAUUSD
+  dukascopy_divisor: 1000 # Dukascopy stores gold price * 1000
+  mt5_symbol: XAUUSD # broker symbol name, e.g. XAUUSD, XAUUSDm, GOLD
+  mt5_server_tz: auto # auto | ny+7 | integer hours offset from UTC (e.g. 3)
+
+sessions: # New York time, "HH:MM"
+  asian_range: ["20:00", "00:00"]
+  london_kz: ["02:00", "05:00"]
+  newyork_kz: ["07:00", "10:00"]
+
+news:
+  block_nfp: true # first Friday of month, 08:30 NY
+  block_before_min: 30
+  block_after_min: 60
+  events_file: data/news_events.csv # extra events (CPI, FOMC...) in UTC
+
+strategy:
+  swing_n: 2 # fractal size on M5 (bars each side)
+  htf_bias: structure # structure (H1 BOS/CHoCH) | none
+  htf_timeframe: 1h # 1h | 4h | 1D
+  htf_swing_n: 2
+  kill_zones: [newyork] # deep test: NY-only beat London+NY
+  liquidity_levels: [asian, london] # asian | pdh_pdl (previous day high/low) | london (London high/low, for NY)
+  smt_symbol: XAGUSD # silver for SMT divergence (null = off)
+  smt_filter: false # true = only trade when gold swept but silver did not (deep test: hurt results)
+  min_displacement_atr: 0.0 # CHoCH candle body must be >= this x ATR
+  midnight_open_filter: false # buy only below / sell only above the NY midnight open
+  atr_period: 14
+  max_bars_sweep_to_choch: 24 # 24 x M5 = 2 hours
+  min_sweep_atr: 0.0 # how far past the Asian level price must sweep (in ATR)
+  entry_model: ob # fvg | ob | fvg_then_ob   (ob tested best)
+  entry_price: ce # ce (50% of FVG/OB) | proximal (edge closest to price)
+  min_fvg_atr: 0.10 # ignore tiny FVGs
+  sl_buffer_atr: 0.50 # SL distance beyond the sweep extreme (0.5 tested best)
+  min_risk_usd: 1.0 # skip setups with SL tighter than this ($ per oz)
+  max_risk_atr: 4.0 # skip setups with SL wider than this
+  tp_mode: rr # rr (fixed R multiple) | liquidity (opposite Asian level)
+  rr: 2.0
+  min_rr: 1.5 # used when tp_mode = liquidity
+  entry_expiry_bars: 12 # cancel limit order if not filled within 12 x M5
+  max_signals_per_day: 3
+  breakeven_at_r: 1.0 # move SL to entry once price reaches +1R (null = off)
+  partial_at_r: 1.0 # close part of the trade at +1R (null = off)
+  partial_frac: 0.5 # fraction closed at partial_at_r
+
+backtest:
+  spread_usd: 0.30 # typical XAUUSD spread; added to entries/exits
+  max_hold_bars: 96 # close trade after 8 hours (96 x M5)
+  initial_equity: 10000
+  risk_per_trade: 0.01 # 1% of equity per trade
+  oos_fraction: 0.30 # last 30% of data reported separately (out-of-sample)
+  reports_dir: reports
+
+live:
+  poll_seconds: 20
+  lookback_days: 6
+  telegram_bot_token: "8714758128:AAGjjbsOyz1rktQ28PUpol9ty-xDTzvKeUo" # or set env TELEGRAM_BOT_TOKEN
+  telegram_chat_id: "1255394122" # or set env TELEGRAM_CHAT_ID

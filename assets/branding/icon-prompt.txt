@@ -1,0 +1,2 @@
+Generator: built-in image_gen tool
+Edit the referenced project logo. Remove the entire navy "TRADING SIGNAL" wordmark below the emblem. Keep ONLY the existing gold TS monogram emblem with its three candlesticks and signal pulse. Preserve the emblem design, proportions, and gold color. Center the emblem in the square image with even padding. No separate text, captions or wordmark. Preserve an actual transparent background and clean edges.

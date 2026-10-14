@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Market data (large, re-download with run_download.py)
+data/*
+!data/news_events.csv
+data/raw/
+
+# Live bot state
+data/live_state.json
+
+# Generated results (re-create with run_backtest.py / research scripts)
+reports/
+research/deep_results.csv
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
