@@ -96,3 +96,9 @@ def latest_closed_bars(symbol, timeframe, count, server_tz):
     if rates is None or len(rates) < 2:
         raise RuntimeError(f"MT5 returned no recent data: {mt5.last_error()}")
     return _frame(rates, server_tz).iloc[:-1]
+
+
+def current_tick(symbol):
+    """(bid, ask) or None."""
+    t = mt5.symbol_info_tick(symbol)
+    return (t.bid, t.ask) if t and t.bid else None

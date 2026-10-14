@@ -17,7 +17,7 @@ Every rule is plain math on candles, and nothing uses future bars (tested in `te
 All values can be changed in [config.yaml](config.yaml).
 
 ### Deep-test results (Jan 2023 → Oct 2026, 320 variants)
-- Current config: **74 trades, 54% win rate, profit factor 1.44, +14.7R, max drawdown 7%**. Positive in all 4 years.
+- Current config (official CPI, NFP, PPI, FOMC news filter): **70 trades, 53% win rate, profit factor 1.38, +12.2R, max drawdown 6%**.
 - Walk-forward (choose settings on past data only, trade the next year): PF 1.25 in 2025, 1.30 in 2026.
   That is the realistic expectation, and lower than the best backtest.
 - What helped: London high/low sweeps in NY, NY-only, order block entries, break-even/partial.
@@ -65,7 +65,7 @@ python run_live.py
 ### Telegram alerts (optional)
 1. In Telegram, message **@BotFather**, send `/newbot`, and copy the token.
 2. Send any message to your new bot, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy `chat.id`.
-3. Put both values in `config.yaml` under `live:`, or set the env vars `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+3. Copy `.env.example` to `.env` and put both values there. `.env` is ignored by git, so never put the token in `config.yaml`.
 
 ### News filter
 NFP (first Friday, 08:30 NY) is blocked automatically. To block other events, add rows to

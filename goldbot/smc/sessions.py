@@ -38,19 +38,22 @@ def session_frame(index, cfg):
     return out
 
 
-def news_mask(index, cfg):
+def news_events(cfg, index):
+    """[(utc_time, name)] for all blocked news events covering the span of `index`."""
     n = cfg["news"]
-    before, after = pd.Timedelta(minutes=n["block_before_min"]), pd.Timedelta(minutes=n["block_after_min"])
-    events = []
-    if n.get("block_nfp"):
-        events += _nfp_times(index)
+    events = [(t, "NFP") for t in _nfp_times(index)] if n.get("block_nfp") else []
     path = resolve(n["events_file"]) if n.get("events_file") else None
     if path is not None and path.exists():
         ev = pd.read_csv(path)
-        if len(ev):
-            events += list(pd.to_datetime(ev["datetime_utc"], utc=True))
+        events += list(zip(pd.to_datetime(ev["datetime_utc"], utc=True), ev["event"]))
+    return events
+
+
+def news_mask(index, cfg):
+    n = cfg["news"]
+    before, after = pd.Timedelta(minutes=n["block_before_min"]), pd.Timedelta(minutes=n["block_after_min"])
     mask = np.zeros(len(index), dtype=bool)
-    for t in events:
+    for t, _ in news_events(cfg, index):
         mask |= (index >= t - before) & (index < t + after)
     return mask
 

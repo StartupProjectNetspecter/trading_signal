@@ -21,10 +21,10 @@ sessions: # New York time, "HH:MM"
   newyork_kz: ["07:00", "10:00"]
 
 news:
-  block_nfp: true # first Friday of month, 08:30 NY
+  block_nfp: false # NFP comes from the official dates in events_file (true = first-Friday guess)
   block_before_min: 30
   block_after_min: 60
-  events_file: data/news_events.csv # extra events (CPI, FOMC...) in UTC
+  events_file: data/news_events.csv # official CPI, NFP, PPI, FOMC release times (UTC)
 
 strategy:
   swing_n: 2 # fractal size on M5 (bars each side)
@@ -64,7 +64,9 @@ backtest:
   reports_dir: reports
 
 live:
-  poll_seconds: 20
+  poll_seconds: 20           # how long each Telegram long-poll waits (buttons still reply instantly)
+  display_tz: Asia/Phnom_Penh   # times shown in Telegram messages
+  allowed_chat_ids: []       # extra Telegram chat IDs allowed to use the bot (owner = telegram_chat_id)
   lookback_days: 6
-  telegram_bot_token: "8714758128:AAGjjbsOyz1rktQ28PUpol9ty-xDTzvKeUo" # or set env TELEGRAM_BOT_TOKEN
-  telegram_chat_id: "1255394122" # or set env TELEGRAM_CHAT_ID
+  telegram_bot_token: ""  # set in .env (TELEGRAM_BOT_TOKEN) - never commit tokens
+  telegram_chat_id: ""  # set in .env (TELEGRAM_CHAT_ID)
