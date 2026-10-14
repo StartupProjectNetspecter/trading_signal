@@ -1,0 +1,10 @@
+#!/bin/sh
+# Appends the current backtest win rate / profit factor to every commit message.
+# Skip merges and squashes; amend (source "commit") is skipped inside the script if stats already exist.
+case "$2" in merge|squash) exit 0 ;; esac
+ROOT="$(git rev-parse --show-toplevel)"
+PY="$ROOT/.venv/Scripts/python.exe"
+[ -x "$PY" ] || PY="$ROOT/.venv/bin/python"
+[ -x "$PY" ] || PY=python
+"$PY" "$ROOT/tools/commit_stats.py" "$1" || echo "commit-stats: could not add backtest stats (commit continues)" >&2
+exit 0

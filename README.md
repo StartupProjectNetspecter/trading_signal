@@ -37,6 +37,7 @@ goldbot/
   backtest/            engine.py (fills, SL/TP, spread, break-even, partials), report.py
   signals/             notifier.py (Telegram)
 research/              experiments.py, combos.py, deep_test.py (variant grid + walk-forward)
+tools/commit_stats.py  adds backtest win rate / PF to every commit message (git hook)
 tests/test_smc.py      unit tests + look-ahead test
 ```
 
@@ -60,6 +61,14 @@ python -m research.deep_test
 
 # 5. Live signals (MT5 must be open and logged in)
 python run_live.py
+```
+
+### Commit messages with backtest results
+Every commit automatically gets the current win rate, profit factor, drawdown and yearly R appended
+(`.githooks/prepare-commit-msg` → `tools/commit_stats.py`). If the strategy code or config changed since
+the last report, the backtest is re-run first. Enable it once after cloning:
+```
+git config core.hooksPath .githooks
 ```
 
 ### Telegram alerts (optional)
