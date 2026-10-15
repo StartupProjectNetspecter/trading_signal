@@ -3,12 +3,12 @@ import json
 
 import pandas as pd
 
-from goldbot.config import resolve
+from goldbot.config import state_path
 from goldbot.smc.sessions import NY, news_events
 from goldbot.signals.names import MODES, get_mode, name
 from goldbot.signals.status import market_status
 
-STATE = resolve("data/daily_plan_state.json")
+STATE = state_path("daily_plan_state.json")
 WINDOWS = [  # (model, NY start, NY end or None)
     ("v1", "07:00", "10:00"),
     ("v2b", "08:00", "15:00"),

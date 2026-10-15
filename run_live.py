@@ -11,7 +11,7 @@ import time
 import pandas as pd
 
 from goldbot.backtest.report import stats
-from goldbot.config import load_config, resolve
+from goldbot.config import load_config, resolve, state_path
 from goldbot.data import mt5_source
 from goldbot.signals import daily_plan
 from goldbot.signals import notifier as tg
@@ -25,8 +25,8 @@ from goldbot.strategy.v2 import generate_v2
 from goldbot.strategy.v3 import generate_v3
 from goldbot.signals.setup_alerts import new_alerts
 
-STATE = resolve("data/live_state.json")
-LOG = resolve("data/signals_log.csv")
+STATE = state_path("live_state.json")
+LOG = state_path("signals_log.csv")
 TRADES = resolve("reports/trades.csv")
 V2_TRADES = resolve("reports/v2_trades.csv")
 V3_TRADES = resolve("reports/v3_trades.csv")

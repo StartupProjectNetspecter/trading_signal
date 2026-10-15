@@ -8,7 +8,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from goldbot.config import resolve
+from goldbot.config import state_path
 from goldbot.data.store import resample
 from goldbot.smc.indicators import atr
 from goldbot.smc.sessions import NY, session_frame
@@ -16,7 +16,7 @@ from goldbot.smc.structure import market_structure
 from goldbot.smc.swings import last_confirmed, swing_points
 from goldbot.strategy.asian_sweep import BAR, _Levels
 
-STATE = resolve("data/setup_alerts_state.json")
+STATE = state_path("setup_alerts_state.json")
 NAMES = {"asian": "Asian", "london": "London", "pdh_pdl": "previous-day"}
 TAG = "ℹ️"
 

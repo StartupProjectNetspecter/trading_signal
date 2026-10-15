@@ -29,3 +29,11 @@ def resolve(path):
     """Resolve a config path relative to the project root."""
     p = Path(path)
     return p if p.is_absolute() else ROOT / p
+
+
+def state_path(name):
+    """Where the live bot keeps its state (journal, settings, auto-trade, alerts).
+    data/state by default; GOLDBOT_STATE_DIR moves it (e.g. a Docker backup volume)."""
+    folder = resolve(os.environ.get("GOLDBOT_STATE_DIR", "data/state"))
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / name

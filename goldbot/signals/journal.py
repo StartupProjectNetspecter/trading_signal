@@ -10,12 +10,12 @@ import numpy as np
 import pandas as pd
 
 from goldbot.backtest.engine import simulate
-from goldbot.config import resolve
+from goldbot.config import state_path
 from goldbot.signals.names import name
 from goldbot.strategy import v2
 
-JOURNAL = resolve("data/journal.csv")
-ALERTS = resolve("data/journal_alerts.json")
+JOURNAL = state_path("journal.csv")
+ALERTS = state_path("journal_alerts.json")
 COLS = ["key", "model", "signal_time", "expiry_time", "direction", "order", "entry", "sl", "tp", "rr",
         "status", "outcome", "r", "fill_time", "exit_time"]
 

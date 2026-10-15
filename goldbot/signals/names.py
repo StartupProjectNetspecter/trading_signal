@@ -1,9 +1,9 @@
 """Friendly strategy names and the trading modes the user can pick in Telegram."""
 import json
 
-from goldbot.config import resolve
+from goldbot.config import state_path
 
-SETTINGS = resolve("data/settings.json")
+SETTINGS = state_path("settings.json")
 
 # internal model key -> short, easy name
 NAMES = {

@@ -15,7 +15,7 @@ import time
 
 import pandas as pd
 
-from goldbot.config import resolve
+from goldbot.config import state_path
 from goldbot.signals.names import name
 from goldbot.signals.notifier import PLAN
 from goldbot.signals.risk import lot_size
@@ -23,7 +23,7 @@ from goldbot.smc.sessions import news_mask
 
 from goldbot.data.mt5_api import mt5  # Windows: MetaTrader5 package · Linux: mt5linux bridge
 
-STATE = resolve("data/auto_state.json")
+STATE = state_path("auto_state.json")
 MAGIC = {"v1": 260101, "v2a": 260102, "v2b": 260103, "v3": 260104}
 OK = (10009, 10008)  # TRADE_RETCODE_DONE, TRADE_RETCODE_PLACED
 

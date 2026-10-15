@@ -1,0 +1,54 @@
+# Self-hosted deployment for the gold signal bot (Telegram + MT5 auto-trade on demo).
+#
+# Topology: one container runs MetaTrader 5 under Wine, the mt5linux bridge and the bot.
+# It only makes OUTBOUND connections (broker + Telegram), so it needs no reverse proxy,
+# no database network and no public port.
+#
+#   docker compose up -d --build        (first start installs MT5: 5-15 min)
+#   docker compose logs -f bot
+#
+# Guide: docs/DOCKER_DEPLOY.md
+
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    # Typical use ~1-1.5 GB (MT5 under Wine ~0.5-0.8 GB, bridge ~0.2 GB, Python ~0.3-0.5 GB).
+    # 3 GB cap leaves headroom for spikes on a 16 GB host without crowding other services.
+    mem_limit: 3072m
+    mem_reservation: 1536m
+    shm_size: 512m          # shared memory for Wine / the virtual screen
+    container_name: trading-signal-bot
+
+    # TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID and optional VNC_PASSWORD.
+    # Without it the bot runs but sends nothing to Telegram.
+    env_file:
+      - .env
+
+    environment:
+      # Live state (journal, mode, auto-trade, alerts) - lands in the backup volume below.
+      GOLDBOT_STATE_DIR: /app/data/state
+
+    volumes:
+      # Live code mount: the container runs whatever is on the host, so
+      # `git pull && docker compose restart bot` updates the bot without a rebuild.
+      - ./:/app
+      # Persistent bot state, backed up with /backup. The container runs as the
+      # non-root `appuser` (uid 1000 by default, see Dockerfile), so the host folder
+      # must be writable by it:
+      #   sudo mkdir -p /backup/apps/trading-signal-bot/data
+      #   docker compose run --rm --entrypoint id bot
+      #   sudo chown -R <uid>:<gid> /backup/apps/trading-signal-bot/data
+      - /backup/apps/trading-signal-bot/data:/app/data/state
+      # MetaTrader 5 + Windows Python + your saved MT5 login (survives rebuilds).
+      - mt5-wine:/home/appuser/.mt5
+
+    # VNC for the one-time MT5 login only. Bound to the host's localhost, never public:
+    # reach it with `ssh -L 5900:localhost:5900 <user>@<server>`.
+    ports:
+      - "127.0.0.1:5900:5900"
+
+    # Healthcheck is inherited from the Dockerfile (bot process running).
+
+volumes:
+  mt5-wine:
