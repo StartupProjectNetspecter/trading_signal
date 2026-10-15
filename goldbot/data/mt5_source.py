@@ -1,13 +1,11 @@
 """Candles from your MetaTrader 5 terminal (must be running and logged in)."""
+import os
 import time
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-try:
-    import MetaTrader5 as mt5
-except ImportError:  # allows backtesting on machines without MT5
-    mt5 = None
+from goldbot.data.mt5_api import mt5  # Windows: MetaTrader5 package · Linux: mt5linux bridge
 
 TIMEFRAMES = {"M1": "TIMEFRAME_M1", "M5": "TIMEFRAME_M5", "M15": "TIMEFRAME_M15", "H1": "TIMEFRAME_H1"}
 
@@ -15,7 +13,8 @@ TIMEFRAMES = {"M1": "TIMEFRAME_M1", "M5": "TIMEFRAME_M5", "M15": "TIMEFRAME_M15"
 def connect(symbol):
     if mt5 is None:
         raise RuntimeError("MetaTrader5 package not installed")
-    if not mt5.initialize():
+    path = os.environ.get("MT5_TERMINAL_PATH")  # Linux/Wine: attach to this terminal, never start a second one
+    if not (mt5.initialize(path=path) if path else mt5.initialize()):
         raise RuntimeError(
             f"MT5 initialize failed: {mt5.last_error()}. Open MetaTrader 5 and log in to your (demo) account."
         )

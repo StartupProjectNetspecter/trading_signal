@@ -113,11 +113,9 @@ class Journal:
     def results_text(self, tz):
         df = self.df
         if df.empty:
-            return "📒 No signals recorded yet. Results appear here automatically after each signal."
+            return "📒 No results yet"
         closed = df[df["status"] == "closed"]
-        lines = ["📒 My Results (live, if every signal was followed exactly)"]
-        lines.append(f"Signals: {len(df)} · closed {len(closed)} · open {(df.status == 'open').sum()} · "
-                     f"waiting {(df.status == 'pending').sum()} · not filled {(df.status == 'no_fill').sum()}")
+        lines = [f"📒 My Results · {len(closed)} closed · {(df.status == 'open').sum()} open"]
         groups = [("All", closed)] + [(name(m), closed[closed["model"] == m]) for m in ("v1", "v2a", "v2b", "v3")]
         for label, g in groups:
             if len(g) == 0:
@@ -125,14 +123,13 @@ class Journal:
             r = g["r"].astype(float)
             loss = -r[r < 0].sum()
             pf = f"{r[r > 0].sum() / loss:.2f}" if loss else "∞"
-            lines.append(f"{label}: {len(r)} trades · win {100 * (r > 0).mean():.0f}% · PF {pf} · {r.sum():+.2f}R")
+            lines.append(f"{label}: {len(r)} · {100 * (r > 0).mean():.0f}% win · PF {pf} · {r.sum():+.1f}R")
         if len(closed):
-            lines.append("\nLast closed:")
-            for row in closed.sort_values("exit_time").tail(5).itertuples():
+            for row in closed.sort_values("exit_time").tail(3).itertuples():
                 t = pd.Timestamp(row.signal_time).tz_convert(tz)
                 icon = "✅" if row.r > 0 else "➖" if row.r == 0 else "❌"
-                lines.append(f"{icon} [{name(row.model)}] {t:%d %b %H:%M} {row.direction} {row.outcome} {row.r:+.2f}R")
-        lines.append("\nBacktest reference: ~52% win rate, PF ~1.45. Judge after 20+ trades.")
+                lines.append(f"{icon} {t:%d %b} {name(row.model)} {row.r:+.2f}R")
+        lines.append("Target: ~55% win · PF >1.1 (after 20+ trades)")
         return "\n".join(lines)
 
     def safety_alerts(self):
@@ -156,11 +153,11 @@ class Journal:
         pf = r[r > 0].sum() / loss if loss else 99
         checks = {
             f"streak@{len(r) - streak}": (streak >= live.get("alert_losing_streak", 6),
-                                f"⚠️ SAFETY: {streak} losses in a row (backtest worst was 4). Consider pausing or halving risk."),
+                                f"⚠️ {streak} losses in a row - consider pausing"),
             f"dd@{peak_at}": (dd >= live.get("alert_drawdown_r", 8),
-                             f"⚠️ SAFETY: live drawdown is {dd:.1f}R (backtest worst ~6R). Consider pausing until reviewed."),
+                             f"⚠️ Drawdown {dd:.1f}R - consider pausing"),
             "pf_low": (len(r) >= live.get("alert_min_trades", 20) and pf < 0.9,
-                       f"⚠️ SAFETY: after {len(r)} trades the live profit factor is {pf:.2f} (backtest ~1.45). The edge may be gone - stop and review."),
+                       f"⚠️ PF {pf:.2f} after {len(r)} trades - stop and review"),
         }
         try:
             sent = set(json.loads(ALERTS.read_text()))

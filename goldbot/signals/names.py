@@ -23,17 +23,17 @@ MODES = {
     "safe": {
         "label": "🛡 Safe",
         "models": ["v1", "v2a", "v2b"],
-        "summary": "Smart Reversal + NY Breakout + Trend Bounce. ~1.5 trades/week · 53% win · PF 1.48. Best for real money.",
+        "summary": "3 strategies · ~1.5/week · 53% win · best for real money",
     },
     "more": {
         "label": "⚡ More Trades",
         "models": ["v1", "v2a", "v2b", "v3"],
-        "summary": "Safe + Dip Buy. ~3 trades/week · 57% win · PF 1.40. Dip Buy needs a low spread - demo first.",
+        "summary": "4 strategies · ~3/week · 57% win · needs low spread",
     },
     "best": {
         "label": "🥇 Best Only",
         "models": ["v2a", "v2b"],
-        "summary": "NY Breakout + Trend Bounce only. ~1.1 trades/week · 53% win · PF 1.57 (highest).",
+        "summary": "2 strategies · ~1.1/week · 53% win · highest PF",
     },
 }
 MODE_BUTTONS = {f"{m['label']} mode": key for key, m in MODES.items()}
@@ -47,23 +47,41 @@ def tag(model):
     return f"[{name(model)}]"
 
 
-def get_mode(cfg):
+def _settings():
     try:
-        mode = json.loads(SETTINGS.read_text()).get("mode")
+        return json.loads(SETTINGS.read_text())
     except (FileNotFoundError, ValueError):
-        mode = None
-    mode = mode or cfg["live"].get("mode", "safe")
+        return {}
+
+
+def _save(**kw):
+    s = _settings()
+    s.update(kw)
+    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS.write_text(json.dumps(s))
+
+
+def get_mode(cfg):
+    mode = _settings().get("mode") or cfg["live"].get("mode", "safe")
     return mode if mode in MODES else "safe"
 
 
 def set_mode(mode):
-    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS.write_text(json.dumps({"mode": mode}))
+    _save(mode=mode)
+
+
+def get_auto():
+    """Auto-trading switch (Telegram 🤖 Auto-Trade). Off unless the user turned it on."""
+    return bool(_settings().get("auto", False))
+
+
+def set_auto(on):
+    _save(auto=bool(on))
 
 
 def mode_text(current):
-    lines = ["⚙️ Trading mode - tap a button below to change:\n"]
+    lines = ["⚙️ Choose a mode:"]
     for key, m in MODES.items():
-        mark = "✅ " if key == current else "▫️ "
-        lines.append(f"{mark}{m['label']}\n   {m['summary']}")
+        mark = "✅" if key == current else "▫️"
+        lines.append(f"{mark} {m['label']}: {m['summary']}")
     return "\n".join(lines)

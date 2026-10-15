@@ -63,6 +63,11 @@ backtest:
   oos_fraction: 0.30 # last 30% of data reported separately (out-of-sample)
   reports_dir: reports
 
+auto_trade:                  # switch on/off in Telegram with 🤖 Auto-Trade (off by default)
+  max_open_trades: 3         # never more than this many open or pending bot trades
+  max_daily_loss_r: 3        # stop opening new trades for the day after losing this many R
+  allow_real: false          # demo only. Do NOT set true until 2-3 months of good demo results
+
 live:
   poll_seconds: 20           # how long each Telegram long-poll waits (buttons still reply instantly)
   risk_per_trade: 0.01       # lot size in each signal = this share of the MT5 balance at the stop loss

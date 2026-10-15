@@ -5,14 +5,15 @@ import pandas as pd
 
 from goldbot.config import resolve
 from goldbot.smc.sessions import NY, news_events
+from goldbot.signals.names import MODES, get_mode, name
 from goldbot.signals.status import market_status
 
 STATE = resolve("data/daily_plan_state.json")
-WINDOWS = [  # (label, NY start, NY end)
-    ("Smart Reversal", "07:00", "10:00"),
-    ("NY Breakout (range 08:30–09:00)", "09:00", "12:30"),
-    ("Trend Bounce", "08:00", "15:00"),
-    ("Dip Buy (⚡ More Trades mode, Tue-Fri)", "18:05", "18:10"),
+WINDOWS = [  # (model, NY start, NY end or None)
+    ("v1", "07:00", "10:00"),
+    ("v2b", "08:00", "15:00"),
+    ("v2a", "09:00", "12:30"),
+    ("v3", "18:05", None),
 ]
 
 
@@ -21,29 +22,32 @@ def _ny_day(now):
 
 
 def plan_text(bars, smt, cfg, tick, active):
+    """Short daily plan: today's windows for the current mode, news, trend and price."""
     tz = cfg["live"].get("display_tz", "Asia/Phnom_Penh")
     now = pd.Timestamp.now(tz="UTC")
     day = _ny_day(now)
     if day.weekday() >= 5:
         day += pd.Timedelta(days=7 - day.weekday())  # weekend -> plan for Monday
-    lines = [f"🗓 Daily plan for {day:%A %d %b} (times in your local time)"]
-    lines.append("\nSignal windows today:")
-    for label, a, b in WINDOWS:
+    models = MODES[get_mode(cfg)]["models"]
+    lines = [f"🗓 {day:%a %d %b} plan · {MODES[get_mode(cfg)]['label']}"]
+    for model, a, b in WINDOWS:
+        if model not in models:
+            continue
         start = (day + pd.Timedelta(a + ":00")).tz_convert(tz)
-        end = (day + pd.Timedelta(b + ":00")).tz_convert(tz)
-        lines.append(f"  • {start:%H:%M}–{end:%H:%M}  {label}")
+        when = f"{start:%H:%M}" if b is None else f"{start:%H:%M}–{(day + pd.Timedelta(b + ':00')).tz_convert(tz):%H:%M}"
+        lines.append(f"{when} {name(model)}")
     after = pd.Timedelta(minutes=cfg["news"]["block_after_min"])
     before = pd.Timedelta(minutes=cfg["news"]["block_before_min"])
-    events = [(t, n) for t, n in news_events(cfg, pd.DatetimeIndex([day.tz_convert("UTC"), (day + pd.Timedelta(days=1)).tz_convert("UTC")]))
-              if day <= t.tz_convert(NY) < day + pd.Timedelta(days=1)]
+    events = sorted((t, n) for t, n in news_events(cfg, pd.DatetimeIndex([day.tz_convert("UTC"), (day + pd.Timedelta(days=1)).tz_convert("UTC")]))
+                    if day <= t.tz_convert(NY) < day + pd.Timedelta(days=1))
     if events:
-        lines.append("\n📰 News today (no signals during the block):")
-        for t, n in sorted(events):
-            lines.append(f"  • {n} {t.tz_convert(tz):%H:%M}  (blocked {(t - before).tz_convert(tz):%H:%M}–{(t + after).tz_convert(tz):%H:%M})")
+        t0 = events[0][0]
+        names_ = ", ".join(dict.fromkeys(n for _, n in events))
+        lines.append(f"📰 {t0.tz_convert(tz):%H:%M} {names_} → no trades {(t0 - before).tz_convert(tz):%H:%M}–{(events[-1][0] + after).tz_convert(tz):%H:%M}")
     else:
-        lines.append("\n📰 No major US news today.")
-    lines.append("\n" + market_status(bars, smt, cfg, tick, active))
-    lines.append("\nPlan: wait for the bot. No setup = no trade. Risk max 0.5–1% per trade.")
+        lines.append("📰 No big news")
+    status = market_status(bars, smt, cfg, tick, active).split("\n")
+    lines.append(status[2] + " · " + status[0].replace("📈 ", ""))  # H1 trend · price
     return "\n".join(lines)
 
 

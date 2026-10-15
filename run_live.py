@@ -16,7 +16,8 @@ from goldbot.data import mt5_source
 from goldbot.signals import daily_plan
 from goldbot.signals import notifier as tg
 from goldbot.signals.journal import Journal
-from goldbot.signals.names import MODES, get_mode, mode_text, name, set_mode
+from goldbot.execution.autotrader import AutoTrader
+from goldbot.signals.names import MODES, get_auto, get_mode, mode_text, name, set_auto, set_mode
 from goldbot.signals.risk import lot_line
 from goldbot.signals.status import market_status
 from goldbot.strategy.asian_sweep import generate_signals
@@ -59,6 +60,7 @@ class LiveBot:
         self.tg = tg.Notifier(cfg)
         self.sent = load_sent()
         self.journal = Journal(cfg)
+        self.auto = AutoTrader(cfg, self.sym, self.tg.send)
         mt5_source.connect(self.sym)
         if self.smt_sym:
             mt5_source.connect(self.smt_sym)
@@ -105,6 +107,10 @@ class LiveBot:
             self.tg.send(self.signal_text(s))
             log_signal(s)
             self.journal.add(key, s)
+            if get_auto():
+                msg = self.auto.place(key, s)
+                if msg:
+                    self.tg.send(msg)
             self.sent.add(key)
             save_sent(self.sent)
 
@@ -118,8 +124,7 @@ class LiveBot:
         for row in self.journal.update(self.bars):
             icon = "✅" if row["r"] > 0 else "➖" if row["r"] == 0 else "❌"
             t = pd.Timestamp(row["signal_time"]).tz_convert(self.tz_local)
-            self.tg.send(f"{icon} Result [{name(row['model'])}] {row['direction']} from {t:%d %b %H:%M}: "
-                         f"{row['outcome']} {row['r']:+.2f}R\n(entry {row['entry']:.2f}, SL {row['sl']:.2f}, TP {row['tp']:.2f})")
+            self.tg.send(f"{icon} {name(row['model'])} {row['direction']} ({t:%d %b %H:%M}): {row['r']:+.2f}R")
         for msg in self.journal.safety_alerts():
             self.tg.send(msg)
 
@@ -139,14 +144,9 @@ class LiveBot:
         if action == "signal":
             a = self.active_signal()
             if a:
-                text = "✅ Valid setup right now:\n\n" + self.signal_text(a)
+                text = self.signal_text(a)
             else:
-                text = (
-                    "⏳ No valid setup right now.\n"
-                    f"Mode {MODES[get_mode(self.cfg)]['label']}: watching "
-                    + ", ".join(name(m) for m in MODES[get_mode(self.cfg)]["models"]) + ".\n"
-                    "You will be alerted automatically the moment one forms.\n\n" + self.status_text()
-                )
+                text = "⏳ No setup now - you'll get it automatically.\n\n" + self.status_text()
         elif action == "status":
             text = self.status_text()
         elif action == "last":
@@ -161,13 +161,26 @@ class LiveBot:
         elif action == "mode":
             self.tg.send(mode_text(get_mode(self.cfg)), chat, buttons=tg.MODE_KEYBOARD)
             return
+        elif action == "auto":
+            self.tg.send(self.auto.status_text(get_auto()), chat, buttons=tg.AUTO_KEYBOARD)
+            return
+        elif action == "auto_on":
+            ok, why = self.auto.ready()
+            if ok:
+                set_auto(True)
+                text = "✅ Auto-Trade ON (demo)"
+            else:
+                text = f"⛔ Cannot turn on: {why}"
+        elif action == "auto_off":
+            set_auto(False)
+            text = "⛔ Auto-Trade OFF (open trades still managed)"
         elif action == "menu":
             text = "Main menu 👇"
         elif action and action.startswith("set_mode:"):
             key = action.split(":", 1)[1]
             set_mode(key)
             self.bars = None  # recompute signals for the new mode on the next check
-            text = f"✅ Mode changed to {MODES[key]['label']}\n{MODES[key]['summary']}"
+            text = f"✅ Mode: {MODES[key]['label']}"
         elif action == "help":
             text = tg.HOW_TO
         elif action == "about":
@@ -175,7 +188,7 @@ class LiveBot:
         elif action == "privacy":
             text = tg.PRIVACY
         elif action == "start":
-            text = "👋 Welcome!\n\n" + tg.ABOUT + "\n\nUse the buttons below."
+            text = "👋 Welcome! Signals arrive automatically. Use the buttons below."
         else:
             text = "Please use the buttons below. 👇"
         self.tg.send(text, chat)
@@ -187,13 +200,13 @@ class LiveBot:
         if not LOG.exists():
             return "📜 No live signals sent yet."
         df = pd.read_csv(LOG, parse_dates=["signal_time"]).tail(n)
-        lines = [f"📜 Last {len(df)} signals"]
+        lines = ["📜 Last signals"]
         for r in df.itertuples():
             t = pd.Timestamp(r.signal_time).tz_convert(self.tz_local)
             icon = "🟢" if r.direction == "BUY" else "🔴"
             model = getattr(r, "model", None)
-            tag = f"[{str(model).upper()}] " if isinstance(model, str) else ""
-            lines.append(f"{icon} {tag}{t:%d %b %H:%M} {r.direction} @ {r.entry:.2f}  SL {r.sl:.2f}  TP {r.tp:.2f}")
+            label = name(model) if isinstance(model, str) else ""
+            lines.append(f"{icon} {t:%d %b %H:%M} {r.direction} {r.entry:.2f} · {label}")
         return "\n".join(lines)
 
     def performance(self):
@@ -208,17 +221,13 @@ class LiveBot:
             v2 = pd.read_csv(V2_TRADES, parse_dates=["signal_time", "exit_time"])
             sets += [(name("v2a"), v2[v2["model"] == "v2a"]), (name("v2b"), v2[v2["model"] == "v2b"])]
         if V3_TRADES.exists():
-            sets.append((name("v3") + " (at $0.30 spread)", pd.read_csv(V3_TRADES, parse_dates=["signal_time", "exit_time"])))
-        lines = [f"📊 Backtest {start:%b %Y} – {end:%b %Y}"]
+            sets.append((name("v3"), pd.read_csv(V3_TRADES, parse_dates=["signal_time", "exit_time"])))
+        lines = [f"📊 Backtest {start:%Y}–{end:%Y} (win · PF · per week)"]
         for label, df in sets:
             s = stats(df, bt["risk_per_trade"], bt["initial_equity"])
             if not s.get("trades"):
                 continue
-            lines.append(
-                f"\n{label}: {s['trades']} trades ({s['trades'] / weeks:.1f}/week)\n"
-                f"  Win rate {s['win_rate_%']}% · PF {s['profit_factor']} · {s['total_R']:+}R · max DD {s['max_drawdown_%']}%"
-            )
-        lines.append("\nSimulation on real historical prices. Live results will differ.")
+            lines.append(f"{label}: {s['win_rate_%']:.0f}% · {s['profit_factor']} · {s['trades'] / weeks:.1f}")
         return "\n".join(lines)
 
     # ---- main loop -------------------------------------------------------
@@ -227,12 +236,12 @@ class LiveBot:
         print(f"Connected to MT5. Symbol={self.sym}, server tz={self.server_tz}. Telegram={'on' if self.tg.enabled else 'off'}")
         print("Watching for setups... (Ctrl+C to stop)")
         mode = MODES[get_mode(self.cfg)]
-        self.tg.send(f"🤖 Gold signal bot started - mode {mode['label']}\n"
-                     f"Watching: {', '.join(name(m) for m in mode['models'])}.\nChange it any time with ⚙️ Mode.")
+        self.tg.send(f"🤖 Bot started · {mode['label']}" + (" · Auto ON" if get_auto() else ""))
         poll = self.cfg["live"]["poll_seconds"]
         while True:
             try:
                 self.refresh()
+                self.auto.manage()  # every loop: fills, expiries, TP1, time exits
             except Exception as e:  # MT5 disconnected / no data: keep the bot alive and retry
                 print(f"{pd.Timestamp.now(tz='UTC'):%H:%M} UTC  MT5 data error: {e}. Retrying in {poll}s...", flush=True)
                 time.sleep(poll)

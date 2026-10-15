@@ -31,65 +31,48 @@ def kill_zone_info(now, cfg):
             start = d + pd.Timedelta(minutes=_minutes(w[0]))
             end = d + pd.Timedelta(minutes=_minutes(w[1]))
             if start <= ny_now < end:
-                return True, f"🟢 {z.upper()} kill zone OPEN (closes {_local(end, cfg):%H:%M}, in {_fmt_delta(end - ny_now)})"
+                return True, f"🟢 NY session open till {_local(end, cfg):%H:%M}"
             if start > ny_now and (best is None or start < best[0]):
                 best = (start, z)
         if best:
             break
     start, z = best
-    return False, f"⏳ Next {z.upper()} kill zone: {_local(start, cfg):%a %H:%M} (in {_fmt_delta(start - ny_now)})"
+    return False, f"⏳ NY session {_local(start, cfg):%a %H:%M} (in {_fmt_delta(start - ny_now)})"
 
 
 def market_status(bars, smt, cfg, tick=None, active=None):
-    sym = cfg["symbol"]
+    """Short status: price, session, H1 trend, today's levels, next news, active signal."""
     now = pd.Timestamp.now(tz="UTC")
-    last = bars.iloc[-1]
-    lines = [f"📈 {sym} market status"]
-    if tick:
-        lines.append(f"Price: {tick[0]:.2f} / {tick[1]:.2f}")
-    else:
-        lines.append(f"Price: {last['close']:.2f} (last M5 close)")
-    lines.append(f"Time: {_local(now, cfg):%H:%M} local · {now.tz_convert(NY):%H:%M} New York")
-
-    _, kz_text = kill_zone_info(now, cfg)
-    lines.append(f"Session: {kz_text}")
-
+    price = tick[0] if tick else bars["close"].iat[-1]
+    lines = [f"📈 {cfg['symbol']} {price:.2f}", kill_zone_info(now, cfg)[1]]
     bias = int(htf_bias(bars, cfg)[-1])
-    tf = cfg["strategy"].get("htf_timeframe", "1h").upper()
-    lines.append(
-        {1: f"{tf} bias: 🟢 Bullish → looking for BUY setups",
-         -1: f"{tf} bias: 🔴 Bearish → looking for SELL setups",
-         0: f"{tf} bias: ⚪ Neutral → no trades until structure breaks"}[bias]
-    )
+    lines.append({1: "H1: 🟢 Bullish (BUY only)", -1: "H1: 🔴 Bearish (SELL only)", 0: "H1: ⚪ Neutral (no trades)"}[bias])
 
-    # today's liquidity levels and whether they have been swept
     sess = session_frame(bars.index, cfg)
     levels = _Levels(bars, sess)
     day = pd.Timestamp(sess["session_day"].iat[-1])
     ds = int(np.flatnonzero(sess["session_day"].to_numpy() == sess["session_day"].iat[-1])[0])
     lv = levels.for_day(day, ds, cfg["strategy"].get("liquidity_levels", ["asian"]))
-    if lv:
-        lines.append("Liquidity today:")
-        for (name, d), (price, avail) in sorted(lv.items(), key=lambda kv: -kv[1][0]):
-            if np.isnan(price) or avail >= len(bars):
+    for name in ("asian", "london"):
+        parts = []
+        for d, side in ((-1, "H"), (1, "L")):
+            if (name, d) not in lv:
                 continue
-            side = "low" if d == 1 else "high"
-            swept = levels.first_breach(price, d, avail, len(bars)) >= 0
-            lines.append(f"  • {LEVEL_NAMES.get(name, name)} {side} {price:.2f} — {'swept ✅' if swept else 'not swept'}")
-    else:
-        lines.append("Liquidity today: Asian range not complete yet")
+            price_lv, avail = lv[(name, d)]
+            if np.isnan(price_lv) or avail >= len(bars):
+                continue
+            swept = levels.first_breach(price_lv, d, avail, len(bars)) >= 0
+            parts.append(f"{side} {price_lv:.2f}{' ✅' if swept else ''}")
+        if parts:
+            lines.append(f"{LEVEL_NAMES.get(name, name)}: " + " · ".join(parts))
 
     after = pd.Timedelta(minutes=cfg["news"]["block_after_min"])
-    upcoming = sorted(
-        (t, name) for t, name in news_events(cfg, pd.DatetimeIndex([now, now + pd.Timedelta(days=40)])) if t + after > now
-    )
+    upcoming = sorted((t, n) for t, n in news_events(cfg, pd.DatetimeIndex([now, now + pd.Timedelta(days=40)])) if t + after > now)
     if upcoming:
-        lines.append("Next news blocks (no signals around these):")
-        for t, name in upcoming[:4]:
-            lines.append(f"  • {name} {_local(t, cfg):%a %d %b %H:%M}")
-
+        t, n = upcoming[0]
+        lines.append(f"📰 {n} {_local(t, cfg):%a %d %b %H:%M}")
     if active:
-        lines.append(f"Active signal: {active['direction']} @ {active['entry']:.2f} (valid until {_local(active['expiry_time'], cfg):%H:%M})")
+        lines.append(f"Signal: {active['direction']} @ {active['entry']:.2f} (till {_local(active['expiry_time'], cfg):%H:%M})")
     else:
-        lines.append("Active signal: none")
+        lines.append("Signal: none")
     return "\n".join(lines)

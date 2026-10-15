@@ -11,43 +11,22 @@ import pandas as pd
 from goldbot.signals.names import MODE_BUTTONS, name
 
 ABOUT = (
-    "🥇 Gold (XAUUSD) signal bot using ICT / Smart Money Concepts.\n\n"
-    "Strategies (backtest Jan 2023 – Oct 2026):\n"
-    "• Smart Reversal - liquidity sweep → CHoCH → order block · 51% win · PF 1.28\n"
-    "• NY Breakout - New York opening range retest · 51% win · PF 1.68\n"
-    "• Trend Bounce - Bollinger re-entry in a strong trend · 55% win · PF 1.42\n"
-    "• Dip Buy - daily reopen buy after a down day · 60% win · PF 1.34 (needs low spread)\n\n"
-    "Pick a mode with ⚙️ Mode: 🛡 Safe, ⚡ More Trades or 🥇 Best Only.\n"
-    "Signals only — it never places trades. Past results do not guarantee future results. Not financial advice."
+    "🥇 Gold (XAUUSD) signal bot · ICT/SMC\n"
+    "Smart Reversal · NY Breakout · Trend Bounce · Dip Buy\n"
+    "Backtest 2023–2026: ~55% win · PF ~1.4\n"
+    "Not financial advice."
 )
-SHORT_ABOUT = "XAUUSD ICT/SMC signals: liquidity sweep → CHoCH → order block, New York session. Signals only, not financial advice."
+SHORT_ABOUT = "Gold (XAUUSD) ICT/SMC signals with entry, SL and TP. Not financial advice."
 HOW_TO = (
-    "📖 How to use\n\n"
-    "1. Signals arrive automatically, about 2–3 per week, mostly 18:00–02:00 Cambodia time.\n"
-    "2. Each signal shows its strategy [Smart Reversal] [NY Breakout] [Trend Bounce] [Dip Buy] and the ORDER TYPE:\n"
-    "   • LIMIT: place a limit order at the Entry. Cancel it if not filled before 'Valid until'.\n"
-    "   • MARKET: enter now (within 5 minutes) at the current price.\n"
-    "3. Always use the SL and TP from the signal.\n"
-    "4. Follow the 'Manage' line (break-even / close half at +1R) and the max hold time.\n"
-    "5. Risk max 0.5–1% of your account per trade.\n\n"
-    "Buttons:\n"
-    "🔎 Signal Now — checks the market immediately: sends the setup if one is valid, otherwise the status\n"
-    "📈 Market Status — price, trend bias, liquidity levels, next session and news\n"
-    "📜 Last Signals — the most recent signals\n"
-    "📊 Performance — backtest results\n"
-    "📒 My Results — live results of every signal, tracked automatically\n"
-    "🗓 Daily Plan — today's windows, news and key levels (also sent every evening)\n\n"
-    "⚙️ Mode lets you choose which strategies send signals (🛡 Safe is best for real money). "
-    "ℹ️ ALERT messages are information (sweeps, trend changes, ranges), never trades.\n\n"
-    "Each signal includes the lot size for your account balance and risk %. "
-    "You get a result message when a trade closes, and a ⚠️ safety alert if live results drift far from the backtest."
+    "📖 How to use\n"
+    "• limit = place order at Entry (cancel at 'until')\n"
+    "• NOW = enter at market\n"
+    "• TP1 = do the action shown · TP2 = final target\n"
+    "• ⏱ = close if still open\n"
+    "• ℹ️ messages are info, not trades\n"
+    "• Risk max 1% per trade"
 )
-PRIVACY = (
-    "🔒 Privacy\n\n"
-    "This bot only uses your Telegram chat ID to send you messages. "
-    "It does not collect, sell or share any other data. "
-    "Signals are logged on the bot owner's computer only."
-)
+PRIVACY = "🔒 Only your chat ID is used. No data is shared."
 PRIVATE = "🔒 This is a private signal bot."
 OFFLINE = object()  # marker: Telegram could not be reached
 
@@ -55,7 +34,7 @@ BUTTONS = [
     ["🔎 Signal Now", "📈 Market Status"],
     ["📜 Last Signals", "📊 Performance"],
     ["📒 My Results", "🗓 Daily Plan"],
-    ["⚙️ Mode"],
+    ["⚙️ Mode", "🤖 Auto-Trade"],
 ]  # How to use / About / Privacy stay available in the Menu as /help, /about, /privacy
 COMMANDS = [
     ("signal", "Check for a signal right now"),
@@ -65,10 +44,12 @@ COMMANDS = [
     ("results", "My live results"),
     ("plan", "Today's market plan"),
     ("mode", "Choose trading mode"),
+    ("auto", "Auto-trading on demo (on/off)"),
     ("help", "How to use the signals"),
     ("about", "About this bot"),
     ("privacy", "Privacy"),
 ]
+AUTO_KEYBOARD = [["✅ Auto ON", "⛔ Auto OFF"], ["⬅️ Back"]]
 MODE_KEYBOARD = [list(MODE_BUTTONS)[:2], list(MODE_BUTTONS)[2:] + ["⬅️ Back"]]
 # button text / command -> action name used by run_live.py
 ACTIONS = {
@@ -79,6 +60,7 @@ ACTIONS = {
     "📒 My Results": "results", "/results": "results",
     "🗓 Daily Plan": "plan", "/plan": "plan",
     "⚙️ Mode": "mode", "/mode": "mode", "⬅️ Back": "menu",
+    "🤖 Auto-Trade": "auto", "/auto": "auto", "✅ Auto ON": "auto_on", "⛔ Auto OFF": "auto_off",
     **{label: f"set_mode:{key}" for label, key in MODE_BUTTONS.items()},
     "📖 How to use": "help", "/help": "help",
     "ℹ️ About": "about", "/about": "about",
