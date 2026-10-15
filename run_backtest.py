@@ -11,6 +11,8 @@ from goldbot.backtest.report import write_report
 from goldbot.config import load_config, resolve
 from goldbot.data.store import load_m5, load_smt
 from goldbot.strategy.asian_sweep import generate_signals
+from goldbot.strategy.v2 import generate_v2
+from goldbot.strategy.v3 import generate_v3
 
 
 def main():
@@ -32,6 +34,25 @@ def main():
     trades = simulate(signals, m5, cfg)
     out = resolve(cfg["backtest"]["reports_dir"])
     print(write_report(trades, m5, cfg, out))
+
+    # v2 (opening range + Bollinger), saved for the Telegram Performance button
+    v2 = generate_v2(m5, cfg)
+    if len(v2):
+        v2 = v2[v2["filled"] & ~v2["outcome"].isin(["open"])].copy()
+        v2.to_csv(out / "v2_trades.csv", index=False)
+        r = v2["r"]
+        loss = -r[r < 0].sum()
+        print(f"\n== v2 ==\n{len(v2)} trades | win {100 * (r > 0).mean():.1f}% | PF {r[r > 0].sum() / loss:.2f} | {r.sum():+.1f}R")
+
+    # Dip Buy (v3): TP 1R, no break-even, 6h max hold
+    c3 = {**cfg, "backtest": {**cfg["backtest"], "max_hold_bars": 72},
+          "strategy": {**cfg["strategy"], "partial_at_r": None, "breakeven_at_r": None}}
+    v3 = simulate(generate_v3(m5, cfg), m5, c3)
+    v3 = v3[v3["filled"]]
+    v3.to_csv(out / "v3_trades.csv", index=False)
+    r = v3["r"]
+    loss = -r[r < 0].sum()
+    print(f"\n== Dip Buy ==\n{len(v3)} trades | win {100 * (r > 0).mean():.1f}% | PF {r[r > 0].sum() / loss:.2f} | {r.sum():+.1f}R")
     print(f"\nSaved reports to {out}")
 
 

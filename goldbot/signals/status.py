@@ -84,8 +84,9 @@ def market_status(bars, smt, cfg, tick=None, active=None):
         (t, name) for t, name in news_events(cfg, pd.DatetimeIndex([now, now + pd.Timedelta(days=40)])) if t + after > now
     )
     if upcoming:
-        t, name = upcoming[0]
-        lines.append(f"Next news block: {name} {_local(t, cfg):%a %d %b %H:%M}")
+        lines.append("Next news blocks (no signals around these):")
+        for t, name in upcoming[:4]:
+            lines.append(f"  • {name} {_local(t, cfg):%a %d %b %H:%M}")
 
     if active:
         lines.append(f"Active signal: {active['direction']} @ {active['entry']:.2f} (valid until {_local(active['expiry_time'], cfg):%H:%M})")

@@ -31,6 +31,10 @@ def simulate(signals, m5, cfg):
         expiry = min(idx.searchsorted(s["expiry_time"]), n)
 
         fill_j, fill_px, outcome = None, None, "expired"
+        if s.get("order") == "market" and start < n:  # filled at the next bar's open
+            fill_j = start
+            fill_px = o[start] + spread if d == 1 else o[start]
+            expiry = start  # skip the limit-order loop
         for j in range(start, expiry):
             if d == 1 and l[j] + spread <= entry:
                 fill_j, fill_px = j, min(entry, o[j] + spread)

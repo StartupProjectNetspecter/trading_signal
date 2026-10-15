@@ -102,3 +102,23 @@ def current_tick(symbol):
     """(bid, ask) or None."""
     t = mt5.symbol_info_tick(symbol)
     return (t.bid, t.ask) if t and t.bid else None
+
+
+def account():
+    """(balance, currency) of the logged-in account, or None."""
+    a = mt5.account_info()
+    return (a.balance, a.currency) if a else None
+
+
+def symbol_specs(symbol):
+    """Money value of a 1.0 price move for 1 lot, plus volume limits."""
+    i = mt5.symbol_info(symbol)
+    t = mt5.symbol_info_tick(symbol)
+    if i is None or t is None or not t.bid:
+        return None
+    # the broker's own profit calculator (handles contract size, cent accounts and currency conversion)
+    value = mt5.order_calc_profit(mt5.ORDER_TYPE_BUY, symbol, 1.0, t.bid, t.bid + 1.0)
+    if not value:
+        return None
+    return {"value_per_price_per_lot": value, "volume_min": i.volume_min,
+            "volume_max": i.volume_max, "volume_step": i.volume_step, "contract_size": i.trade_contract_size}

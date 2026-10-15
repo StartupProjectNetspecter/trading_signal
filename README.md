@@ -17,7 +17,8 @@ Every rule is plain math on candles, and nothing uses future bars (tested in `te
 All values can be changed in [config.yaml](config.yaml).
 
 ### Deep-test results (Jan 2023 → Oct 2026, 320 variants)
-- Current config (official CPI, NFP, PPI, FOMC news filter): **70 trades, 53% win rate, profit factor 1.38, +12.2R, max drawdown 6%**.
+- Current config (official CPI, NFP, PPI, FOMC, Retail Sales news filter): **68 trades, 51.5% win rate, profit factor 1.28, +9.2R, max drawdown 6%**.
+- v2 (opening range + Bollinger): **228 trades, 51.3% win rate, profit factor 1.48, +35.9R**.
 - Walk-forward (choose settings on past data only, trade the next year): PF 1.25 in 2025, 1.30 in 2026.
   That is the realistic expectation, and lower than the best backtest.
 - What helped: London high/low sweeps in NY, NY-only, order block entries, break-even/partial.

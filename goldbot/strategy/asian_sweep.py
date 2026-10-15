@@ -100,9 +100,11 @@ def generate_signals(m5, cfg, smt_df=None):
     o, h, l, c = to_np(m5)
     n = st["swing_n"]
     sh, sl = swing_points(h, l, n)
-    sh_level, _ = last_confirmed(h, sh, n)
-    sl_level, _ = last_confirmed(l, sl, n)
+    sh_level, sh_idx = last_confirmed(h, sh, n)
+    sl_level, sl_idx = last_confirmed(l, sl, n)
     atr_ = atr(m5, st["atr_period"]).to_numpy()
+    models = st.get("models", ["reversal"])
+    m5_events = market_structure(m5, n)["event"].to_numpy() if "continuation" in models else None
     sess = session_frame(m5.index, cfg)
     bias = htf_bias(m5, cfg)
     enabled = st.get("liquidity_levels", ["asian"])
@@ -145,7 +147,7 @@ def generate_signals(m5, cfg, smt_df=None):
 
         sides = {1: _Side(1), -1: _Side(-1)}
         count = 0
-        for i in range(scan_from, de):
+        for i in range(scan_from, de) if "reversal" in models else ():
             if count >= st["max_signals_per_day"]:
                 break
             a = atr_[i]
@@ -189,7 +191,38 @@ def generate_signals(m5, cfg, smt_df=None):
                     s.done = True
                     count += 1
                     signals.append(sig)
-    return pd.DataFrame(signals)
+
+        # --- continuation model: M5 structure break in the H1 trend direction, enter on the pullback
+        if m5_events is not None:
+            taken = {sg["signal_time"] for sg in signals}
+            per_dir = {1: 0, -1: 0}
+            for i in range(scan_from, de):
+                if count >= st["max_signals_per_day"]:
+                    break
+                ev = m5_events[i]
+                if not ev or not kz[i] or news[i] or np.isnan(atr_[i]):
+                    continue
+                d = 1 if ev.endswith("_UP") else -1
+                if st.get("continuation_events", "bos") == "bos" and not ev.startswith("BOS"):
+                    continue
+                if bias[i] != d or per_dir[d] >= st.get("max_continuation_per_dir", 1) or close_time[i] in taken:
+                    continue
+                leg_idx = sl_idx[i] if d == 1 else sh_idx[i]  # the pullback extreme the move started from
+                if leg_idx < 0:
+                    continue
+                leg = _Side(d)
+                leg.ext, leg.ext_idx, leg.start, leg.levels = (l if d == 1 else h)[leg_idx], leg_idx, leg_idx, ["bos"]
+                sig = _build_signal(d, i, leg, o, h, l, c, atr_[i], levels, st, sess, bias, close_time, midnight_open, False)
+                if sig:
+                    sig["model"] = "continuation"
+                    per_dir[d] += 1
+                    count += 1
+                    signals.append(sig)
+    out = pd.DataFrame(signals)
+    if len(out):
+        out["model"] = out["model"].fillna("reversal") if "model" in out else "reversal"
+        out = out.sort_values("signal_time", kind="stable").reset_index(drop=True)
+    return out
 
 
 def _smt(silver, silver_levels, s, d, i):
@@ -212,6 +245,8 @@ def _build_signal(d, i, s, o, h, l, c, a, levels, st, sess, bias, close_time, mi
     # displacement: the CHoCH candle must have a strong body
     if abs(c[i] - o[i]) < st.get("min_displacement_atr", 0.0) * a:
         return None
+    if st["entry_price"] == "market":
+        return _finish_signal(d, i, s, c[i], c[i], c[i], "market", o, c, a, levels, st, sess, bias, close_time, smt)
     # --- 3) entry zone: FVG from the displacement, else the order block
     zone, model = None, None
     f = latest_fvg(h, l, s.ext_idx + 2, i, d, st["min_fvg_atr"] * a) if st["entry_model"] != "ob" else None
@@ -233,7 +268,10 @@ def _build_signal(d, i, s, o, h, l, c, a, levels, st, sess, bias, close_time, mi
     # premium/discount vs midnight open: buy below it, sell above it
     if st.get("midnight_open_filter") and (entry - midnight_open) * d > 0:
         return None
+    return _finish_signal(d, i, s, entry, bottom, top, model, o, c, a, levels, st, sess, bias, close_time, smt)
 
+
+def _finish_signal(d, i, s, entry, bottom, top, model, o, c, a, levels, st, sess, bias, close_time, smt):
     # --- 4) risk
     sl = s.ext - d * st["sl_buffer_atr"] * a
     risk = (entry - sl) * d
@@ -255,13 +293,14 @@ def _build_signal(d, i, s, o, h, l, c, a, levels, st, sess, bias, close_time, mi
         "signal_time": close_time[i],
         "expiry_time": close_time[i] + st["entry_expiry_bars"] * BAR,
         "direction": "BUY" if d == 1 else "SELL",
-        "entry": round(entry, 2),
-        "sl": round(sl, 2),
-        "tp": round(tp, 2),
+        "entry": round(entry, st.get("price_digits", 2)),
+        "sl": round(sl, st.get("price_digits", 2)),
+        "tp": round(tp, st.get("price_digits", 2)),
         "rr": round(rr, 2),
         "session": kz_name,
         "liquidity": "+".join(s.levels),
         "entry_model": model,
+        "order": "market" if model == "market" else "limit",
         "smt": bool(smt),
         # features (for analysis and the future ML filter)
         "atr": round(a, 3),

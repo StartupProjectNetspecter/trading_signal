@@ -22,3 +22,9 @@ research/deep_results.csv
 .idea/
 Thumbs.db
 .DS_Store
+
+# research outputs
+research/*_results.csv
+
+# research build artifacts
+research/.search_build/
